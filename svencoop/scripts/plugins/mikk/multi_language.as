@@ -1,7 +1,14 @@
+/*
+	"plugin"
+	{
+		"name" "Multi-Language"
+		"script" "mikk/multi_language"
+	}
+*/
 void PluginInit()
 {
 	g_Module.ScriptInfo.SetAuthor( "Gaftherman & Mikk" );
-	g_Module.ScriptInfo.SetContactInfo( "https://github.com/Mikk155/Sven-Coop-Multi-language-localizations" );
+	g_Module.ScriptInfo.SetContactInfo( "https://github.com/Gaftherman | https://github.com/Mikk155" );
 
 	g_Hooks.RegisterHook( Hooks::Game::MapChange, @MapChange );
     g_Hooks.RegisterHook( Hooks::Player::ClientDisconnect, @ClientDisconnect );
@@ -23,7 +30,7 @@ void MapStart()
 			{ "message_portuguese", "[Multi-Language] Agora mostrara mensagens de mapas em Portugues.\nAlguns caracteres nao serao mostrados por limitacoes.\n"},
 			{ "message_german", "[Multi-Language] Zeigt Kartennachrichten jetzt auf Deutsch an.\nEinige Zeichen werden aufgrund von Einschrankungen nicht angezeigt.\n"},
 			{ "message_french", "[Multilingue] Affichera desormais les messages cartographiques en francaise.\nCertains caracteres ne seront pas affiches en raison des limitations.\n"},
-			{ "message_italian", "[Multilingua] Ora mostrera i messaggi delle mappe in francese.\nAlcuni caratteri non verranno mostrati per limitazioni.\n"},
+			{ "message_italian", "[Multilingua] Ora mostrera i messaggi delle mappe in italiano.\nAlcuni caratteri non verranno mostrati per limitazioni.\n"},
 			{ "message_esperanto", "[Multlingva] Nuud kuvab kaarditeateid esperanto keeles.\nMonda tahemarki piirangute tottu ei kuvata.\n"},
 			{ "x", "-1"},
 			{ "y", "0.90"},
