@@ -13,7 +13,7 @@
 // This is the time players must wait to resurrect
 // 0 = based on mp_respawndelay cvar.
 
-float RespawnDelay = 0;
+float RespawnDelay = 30;
 
 void PluginInit()
 {
@@ -23,16 +23,15 @@ void PluginInit()
 
 void MapStart()
 {
-	if( RespawnDelay == 0 )
-	{
-		RespawnDelay = g_EngineFuncs.CVarGetFloat( "mp_respawndelay" );
-	}
-	
 	if( g_EngineFuncs.CVarGetFloat("mp_survival_supported") == 0 )
-    {
+	{
 		g_Scheduler.SetTimeout( "SurvivalModeEnable", 10.0f );
 		g_EngineFuncs.CVarSetFloat( "mp_survival_startdelay", 0 );
 		g_EngineFuncs.CVarSetFloat( "mp_survival_supported", 1 );
+	}
+	if( RespawnDelay == 0 )
+	{
+		RespawnDelay = g_EngineFuncs.CVarGetFloat( "mp_respawndelay" );
 	}
 }
 

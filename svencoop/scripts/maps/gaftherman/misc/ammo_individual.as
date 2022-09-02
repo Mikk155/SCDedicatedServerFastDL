@@ -173,11 +173,6 @@ class func_recharge_individual : ScriptBaseEntity
 				g_Game.AlertMessage(at_console, string(pActivator.pev.netname) + " juice is: "+pData.juice+"\n");
 			}
 		}
-		else if( TriggerOnEmpty != "" )
-		{
-			g_EngineFuncs.FireTargets( TriggerOnEmpty, pActivator, self, USE_TOGGLE );
-			g_Game.AlertMessage(at_console, "Fired target\n");
-		}
 	}
 
 	CBaseKeepData@ GetPlayerJuice(CBasePlayer@ pPlayer)

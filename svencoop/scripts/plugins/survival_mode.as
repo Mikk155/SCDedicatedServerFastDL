@@ -20,15 +20,13 @@ void PluginInit()
     g_Module.ScriptInfo.SetContactInfo( "https://github.com/Mikk155" );
 }
 
-void MapInit()
+float flSurvivalStartDelay = 10;
+
+void MapStart()
 {
-	const bool bSurvivalEnabled = g_EngineFuncs.CVarGetFloat("mp_survival_starton") == 1 && g_EngineFuncs.CVarGetFloat("mp_survival_supported") == 1;
-
-	const bool bDropWeapEnabled = g_EngineFuncs.CVarGetFloat("mp_dropweapons") == 1;
-
-	float flSurvivalStartDelay = g_EngineFuncs.CVarGetFloat( "mp_survival_startdelay" );
+	flSurvivalStartDelay = g_EngineFuncs.CVarGetFloat( "mp_survival_startdelay" );
 	
-	if( bSurvivalEnabled )
+	if( g_EngineFuncs.CVarGetFloat("mp_survival_starton") == 1 && g_EngineFuncs.CVarGetFloat("mp_survival_supported") == 1 )
 	{
 		g_SurvivalMode.Disable();
 		g_Scheduler.SetTimeout( "SurvivalModeEnable", flSurvivalStartDelay );
@@ -36,21 +34,13 @@ void MapInit()
 		g_EngineFuncs.CVarSetFloat( "mp_survival_starton", 0 );
 		g_EngineFuncs.CVarSetFloat( "mp_dropweapons", 0 );
 	}
-	if( bDropWeapEnabled )
-	{
-		g_EngineFuncs.CVarSetFloat( "mp_dropweapons", 0 );
-	}
 }
 
 void SurvivalModeEnable()
 {
-    g_SurvivalMode.Activate( true );
-	
-	if( bDropWeapEnabled )
-	{
-		g_EngineFuncs.CVarSetFloat( "mp_dropweapons", 1 );
-	}
-	
+	g_SurvivalMode.Activate( true );
+	g_SurvivalMode.Enable();
+	g_EngineFuncs.CVarSetFloat( "mp_dropweapons", 1 );
     NetworkMessage message( MSG_ALL, NetworkMessages::SVC_STUFFTEXT );
     message.WriteString( "spk buttons/bell1" );
     message.End();
