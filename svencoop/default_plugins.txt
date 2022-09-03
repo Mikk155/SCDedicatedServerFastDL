@@ -1,0 +1,59 @@
+//========================================
+//
+//	This file lists all plugins that are loaded by the game
+//	Plugins use Angelscript
+//
+//========================================
+"plugins"
+{
+    "plugin"
+    {
+        "name" "AFBase"
+        "script" "AFBase"
+    }
+    "plugin"
+    {
+        "name" "AFBaseExpansions"
+        "script" "AFBaseExpansions"
+    }
+    "plugin"
+    {
+        "name" "DynamicDifficulty"
+        "script" "DynamicDifficulty"
+    }
+	"plugin"
+	{
+		"name" "Anti Block"
+		"script" "AntiBlock"
+	}
+	"plugin"
+	{
+		"name" "Player Decal Tracker"
+		"script" "PlayerDecalTracker"
+	}
+	"plugin"
+	{
+		"name" "SurvivalManager"
+		"script" "mikk/SurvivalManager"
+	}
+	"plugin"
+	{
+		"name" "AfkManager"
+		"script" "mikk/AfkManager"
+	}
+	"plugin"
+	{
+		"name" "ClassicMode"
+		"script" "mikk/ClassicMode"
+	}
+	"plugin"
+	{
+		"name" "Multi-Language"
+		"script" "mikk/multi_language"
+	}
+	"plugin"
+	{
+		"name" "UseOnlyItems"
+		"script" "mikk/UseOnlyItems"
+	}
+}
