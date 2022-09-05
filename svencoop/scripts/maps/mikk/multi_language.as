@@ -5,9 +5,9 @@ INSTALL:
 #include "mikk/entities/utils"
 #include "mikk/multi_language"
 
-void MapInit()
+void MapActivate()
 {
-	MultiLanguageInit();
+	MultiLanguageRemap();
 }
 
 - Suggestions:

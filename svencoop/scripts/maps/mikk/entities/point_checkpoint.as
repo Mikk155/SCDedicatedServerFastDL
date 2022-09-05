@@ -1,7 +1,4 @@
 /*
-	Sorry for my edit but i can't leave any "if" without his {keys}
-	
-	
 
 INSTALL:
 
@@ -25,35 +22,9 @@ HUDTextParams SpawnCountHudText;
 
 void RegisterPointCheckPointEntity()
 {
-	g_Hooks.RegisterHook( Hooks::Player::PlayerPreThink, @PlayerUseSpawn::PlayerUse );
+	g_Scheduler.SetInterval( "CheckTime", 1.0f, g_Scheduler.REPEAT_INFINITE_TIMES);
 	g_CustomEntityFuncs.RegisterCustomEntity( "point_checkpoint", "point_checkpoint" );
 	g_Game.PrecacheOther( "point_checkpoint" );
-
-	keyvalues =	
-	{
-		{ "message", "Press 'E' key or 'Primary attack' to respawn"},
-		{ "message_spanish", "Presione la tecla 'E' o 'ataque primario' para reaparecer"},
-		{ "message_portuguese", "Pressione a tecla 'E' ou 'Ataque primario' para reaparecer"},
-		{ "message_french", "Appuyez sur la touche 'E' ou 'Attaque principale' pour reapparaitre"},
-		{ "message_italian", "Premi il tasto 'E' o 'Attacco primario' per rigenerarti"},
-		{ "message_esperanto", "Premu la 'E' au 'Prima atako' klavon por reakiri"},
-		{ "message_german", "Drucken Sie die 'E'-Taste oder 'Primarangriff', um zu respawnen"},
-		{ "x", "-1"},
-		{ "y", "0.67"},
-		{ "effect", "0"},
-		{ "holdtime", "1"},
-		{ "fadeout", "0"},
-		{ "fadein", "0"},
-		{ "channel", "7"},
-		{ "fxtime", "0"},
-		{ "color", "255 0 0"},
-		{ "color2", "100 100 100"},
-		{ "spawnflags", "2"}, // No echo console + activator only
-		{ "targetname", "GZ_IZL_HOWTOUSE"}
-	};
-	if( g_CustomEntityFuncs.IsCustomEntity( "game_text_custom" ) )
-	{ g_EntityFuncs.CreateEntity( "game_text_custom", keyvalues, true ); }
-	else{ g_EntityFuncs.CreateEntity( "game_text", keyvalues, true ); }
 }
 
 /*
@@ -65,12 +36,13 @@ Outerbeast: - additional fixes and improvements were made, still WIP.
 I've signed every change I made, just ctrl+f "Outerbeast"
 */
 
-enum PointCheckpointFlags
+enum point_checkpoint_flag
 {
 	SF_CHECKPOINT_REUSABLE 		= 1 << 0,	//This checkpoint is reusable
 	SF_CHECKPOINT_STARTINACTIVE	= 1 << 1,	//This checkpoint starts disabled, trigger to enable - Outerbeast
 	SF_DONT_EQUIP_SPAWNED		= 1 << 2,	//Disable spawned players from triggering game_player_equips - Outerbeast
-	SF_TRIGGERED_MSG			= 1 << 3	//Print a chat message showing a checkpoint was triggered - Outerbeast
+	SF_TRIGGERED_MSG			= 1 << 3,	//Print a chat message showing a checkpoint was triggered - Outerbeast
+	SF_SAVE_ALIVE_LIFES			= 1 << 4	//Saves alive player's lifes -Mikk
 }
 
 class point_checkpoint : ScriptBaseAnimating
@@ -339,8 +311,13 @@ class point_checkpoint : ScriptBaseAnimating
 		if( !m_bInitialised )
 		{
 			m_bInitialised = Initialise();
+			if( !self.pev.SpawnFlagBitSet( SF_TRIGGERED_MSG ) )
+				CHECKPOINT_UTILS::ChatMessager( 0, cast<CBasePlayer@>(pActivator) );
 			return;
 		}
+
+		if( !self.pev.SpawnFlagBitSet( SF_TRIGGERED_MSG ) )
+			CHECKPOINT_UTILS::ChatMessager( 2, cast<CBasePlayer@>(pActivator) );
 
 		self.Touch( pActivator !is null ? pActivator : ( pCaller !is null ? pCaller : self ) );
 	}
@@ -351,20 +328,9 @@ class point_checkpoint : ScriptBaseAnimating
 		{
 			return;
 		}
-		
-		// Option to indicate a checkpoint was used in chat - Outerbeast
-		if( self.pev.SpawnFlagBitSet( SF_TRIGGERED_MSG ) )
-		{
-			if(string(g_Engine.mapname).StartsWith ( "aom" ) )
-			{
-				g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "Checkpoint reached..\n" );
-			}
-			else
-			{
-				g_Game.AlertMessage( at_logged, "CHECKPOINT: \"%1\" activated Checkpoint\n", pOther.pev.netname );
-				g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "" + pOther.pev.netname + " activated a Checkpoint.\n" );
-			}
-		}
+
+		CHECKPOINT_UTILS::ChatMessager( 1, cast<CBasePlayer@>(pOther) );
+
 		// Set activated
 		self.pev.frags = 1.0f;
 
@@ -525,7 +491,7 @@ class point_checkpoint : ScriptBaseAnimating
 					}
 				}
 				
-				else if(string(g_Engine.mapname).StartsWith ( "th_" ) )
+				if(string(g_Engine.mapname).StartsWith ( "th_" ) )
 				{
 					LightningEffect( pPlayer );
 				}
@@ -542,8 +508,9 @@ class point_checkpoint : ScriptBaseAnimating
 				++m_iNextPlayerToRevive; //Make sure to increment this to avoid unneeded loop
 				break;
 			}
+
 			// Now save living people's lifes -Mikk
-			else if( pPlayer !is null && pPlayer.IsAlive() )
+			if( pPlayer !is null && pPlayer.IsAlive() && !self.pev.SpawnFlagBitSet( SF_SAVE_ALIVE_LIFES ))
 			{
 				CustomKeyvalues@ ckvSpawns = pPlayer.GetCustomKeyvalues();
 				int kvSpawnIs = ckvSpawns.GetKeyvalue("$i_pointcheckpoint").GetInteger();
@@ -634,42 +601,37 @@ class point_checkpoint : ScriptBaseAnimating
 	}
 }
 
-// Namespace for living peoples
-namespace PlayerUseSpawn
+void CheckTime()
 {
-	HookReturnCode PlayerUse( CBasePlayer@ pPlayer, uint& out uiFlags )
+	for( int iPlayer = 1; iPlayer <= g_Engine.maxClients; ++iPlayer )
 	{
+		CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex( iPlayer );
+
+		if( pPlayer is null or !pPlayer.IsConnected() )
+			continue;
+
 		CustomKeyvalues@ ckvSpawns = pPlayer.GetCustomKeyvalues();
 		int kvSpawnIs = ckvSpawns.GetKeyvalue("$i_pointcheckpoint").GetInteger();
 
-		if( pPlayer is null or kvSpawnIs <= 0 )
-		{
-			return HOOK_CONTINUE;
-		}
+		if( kvSpawnIs <= 0 )
+			continue;
 
-		SpawnCountHudText.x = 0.05;
-		SpawnCountHudText.y = 0.05;
-		SpawnCountHudText.effect = 0;
-		SpawnCountHudText.r1 = RGBA_SVENCOOP.r;
-		SpawnCountHudText.g1 = RGBA_SVENCOOP.g;
-		SpawnCountHudText.b1 = RGBA_SVENCOOP.b;
-		SpawnCountHudText.a1 = 0;
-		SpawnCountHudText.r2 = RGBA_SVENCOOP.r;
-		SpawnCountHudText.g2 = RGBA_SVENCOOP.g;
-		SpawnCountHudText.b2 = RGBA_SVENCOOP.b;
-		SpawnCountHudText.a2 = 0;
-		SpawnCountHudText.fadeinTime = 0; 
-		SpawnCountHudText.fadeoutTime = 0.25;
-		SpawnCountHudText.holdTime = 0.2;
-		SpawnCountHudText.fxTime = 0;
-		SpawnCountHudText.channel = 6;
+		CustomKeyvalues@ ckLenguage = pPlayer.GetCustomKeyvalues();
+		CustomKeyvalue ckLenguageIs = ckLenguage.GetKeyvalue("$f_lenguage");
+		int iLanguage = int(ckLenguageIs.GetFloat());
 
-		g_PlayerFuncs.HudMessage(pPlayer, SpawnCountHudText, "Checkpoints: " + kvSpawnIs +"" );
+		if(iLanguage == 1 ) g_PlayerFuncs.HudMessage(pPlayer, SpawnCountHudText, "Checkpoints: " + kvSpawnIs +"" );
+		else if(iLanguage == 2 ) g_PlayerFuncs.HudMessage(pPlayer, SpawnCountHudText, "Checkpoints: " + kvSpawnIs +"" );
+		else if(iLanguage == 3 ) g_PlayerFuncs.HudMessage(pPlayer, SpawnCountHudText, "Checkpoints: " + kvSpawnIs +"" );
+		else if(iLanguage == 4 ) g_PlayerFuncs.HudMessage(pPlayer, SpawnCountHudText, "Checkpoints: " + kvSpawnIs +"" );
+		else if(iLanguage == 5 ) g_PlayerFuncs.HudMessage(pPlayer, SpawnCountHudText, "Checkpoints: " + kvSpawnIs +"" );
+		else if(iLanguage == 6 ) g_PlayerFuncs.HudMessage(pPlayer, SpawnCountHudText, "Checkpoints: " + kvSpawnIs +"" );
+		else g_PlayerFuncs.HudMessage(pPlayer, SpawnCountHudText, "Checkpoints: " + kvSpawnIs +"" );
 
 		if( !pPlayer.IsAlive() && pPlayer.GetObserver().IsObserver() )
 		{
-			g_EntityFuncs.FireTargets( "GZ_IZL_HOWTOUSE", pPlayer, pPlayer, USE_ON );
-		
+			CHECKPOINT_UTILS::ChatMessager( 3, pPlayer );
+
 			if( pPlayer.m_afButtonLast & IN_ATTACK != 0 || pPlayer.m_afButtonLast & IN_USE != 0  )
 			{
 				pPlayer.GetObserver().RemoveDeadBody(); //Remove the dead player body
@@ -679,10 +641,85 @@ namespace PlayerUseSpawn
 
 				// Must include https://github.com/Outerbeast/Entities-and-Gamemodes/blob/master/respawndead_keepweapons.as
 				RESPAWNDEAD_KEEPWEAPONS::ReEquipCollected( pPlayer, true );
-				
+
 				ckvSpawns.SetKeyvalue("$i_pointcheckpoint", kvSpawnIs - 1 );
 			}
 		}
-		return HOOK_CONTINUE;
 	}
-}	// End of namespace
+}
+
+namespace CHECKPOINT_UTILS
+{
+	void ChatMessager( int mode, CBasePlayer@ pActivator )
+	{
+		for( int iPlayer = 1; iPlayer <= g_Engine.maxClients; ++iPlayer )
+		{
+			CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex( iPlayer );
+
+			if(pPlayer is null or !pPlayer.IsConnected() )
+				continue;
+
+			SpawnCountHudText.x = 0.50;
+			SpawnCountHudText.y = 0.50;
+			SpawnCountHudText.effect = 0;
+			SpawnCountHudText.r1 = RGBA_SVENCOOP.r;
+			SpawnCountHudText.g1 = RGBA_SVENCOOP.g;
+			SpawnCountHudText.b1 = RGBA_SVENCOOP.b;
+			SpawnCountHudText.a1 = 0;
+			SpawnCountHudText.r2 = RGBA_SVENCOOP.r;
+			SpawnCountHudText.g2 = RGBA_SVENCOOP.g;
+			SpawnCountHudText.b2 = RGBA_SVENCOOP.b;
+			SpawnCountHudText.a2 = 0;
+			SpawnCountHudText.fadeinTime = 0; 
+			SpawnCountHudText.fadeoutTime = 0.25;
+			SpawnCountHudText.holdTime = 0.2;
+			SpawnCountHudText.fxTime = 0;
+			SpawnCountHudText.channel = 6;
+
+			CustomKeyvalues@ ckLenguage = pPlayer.GetCustomKeyvalues();
+			CustomKeyvalue ckLenguageIs = ckLenguage.GetKeyvalue("$f_lenguage");
+			int iLanguage = int(ckLenguageIs.GetFloat());
+
+			if( mode == 0 )
+			{
+				if(iLanguage == 1 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 2 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 3 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 4 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 5 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 6 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "Checkpoint has been spawned.\n" );
+			}
+			else if( mode == 1 )
+			{
+				if(iLanguage == 1 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 2 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 3 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 4 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 5 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 6 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "" + pActivator.pev.netname + " activated a Checkpoint.\n" );
+			}
+			else if( mode == 2 )
+			{
+				if(iLanguage == 1 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 2 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 3 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 4 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 5 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else if(iLanguage == 6 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" );
+				else g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "Checkpoint has been activated.\n" );
+			}
+			else if( mode == 3 )
+			{
+				if(iLanguage == 1 ) g_PlayerFuncs.HudMessage(pActivator, SpawnCountHudText, "Presione la tecla 'E' o 'ataque primario' para reaparecer" );
+				else if(iLanguage == 2 ) g_PlayerFuncs.HudMessage(pActivator, SpawnCountHudText, "Pressione a tecla 'E' ou 'Ataque primario' para reaparecer" );
+				else if(iLanguage == 3 ) g_PlayerFuncs.HudMessage(pActivator, SpawnCountHudText, "Drucken Sie die 'E'-Taste oder 'Primarangriff', um zu respawnen" );
+				else if(iLanguage == 4 ) g_PlayerFuncs.HudMessage(pActivator, SpawnCountHudText, "Appuyez sur la touche 'E' ou 'Attaque principale' pour reapparaitre" );
+				else if(iLanguage == 5 ) g_PlayerFuncs.HudMessage(pActivator, SpawnCountHudText, "Premi il tasto 'E' o 'Attacco primario' per rigenerarti" );
+				else if(iLanguage == 6 ) g_PlayerFuncs.HudMessage(pActivator, SpawnCountHudText, "Premu la 'E' au 'Prima atako' klavon por reakiri" );
+				else g_PlayerFuncs.HudMessage(pActivator, SpawnCountHudText, "Press 'E' key or 'Primary attack' to respawn" );
+			}
+		}
+	}
+}

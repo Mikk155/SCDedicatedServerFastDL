@@ -16,11 +16,6 @@
         "name" "AFBaseExpansions"
         "script" "AFBaseExpansions"
     }
-    "plugin"
-    {
-        "name" "DynamicDifficulty"
-        "script" "DynamicDifficulty"
-    }
 	"plugin"
 	{
 		"name" "Anti Block"
@@ -31,11 +26,12 @@
 		"name" "Player Decal Tracker"
 		"script" "PlayerDecalTracker"
 	}
-	"plugin"
-	{
-		"name" "SurvivalManager"
-		"script" "mikk/SurvivalManager"
-	}
+
+    "plugin"
+    {
+        "name" "DynamicDifficulty"
+        "script" "DynamicDifficulty"
+    }
 	"plugin"
 	{
 		"name" "AfkManager"
@@ -43,17 +39,28 @@
 	}
 	"plugin"
 	{
-		"name" "ClassicMode"
-		"script" "mikk/ClassicMode"
+		"name" "UseOnlyItems"
+		"script" "mikk/UseOnlyItems"
+	}
+	"plugin"
+	{
+		"name" "SurvivalManager"
+		"script" "mikk/SurvivalManager"
+	}
+	"plugin"
+	{
+		"name" "RenameServer"
+		"script" "mikk/RenameServer"
 	}
 	"plugin"
 	{
 		"name" "Multi-Language"
 		"script" "mikk/multi_language"
 	}
-	"plugin"
-	{
-		"name" "UseOnlyItems"
-		"script" "mikk/UseOnlyItems"
-	}
+
+//	"plugin"
+//	{
+//		"name" "Halloween"
+//		"script" "mikk/Halloween"
+//	}
 }

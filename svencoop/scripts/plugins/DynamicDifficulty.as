@@ -1,23 +1,50 @@
-//To permanently block the use of vote of a specific player, put their SteamID here.
-array<string> SteamIDArray = 
-{
-    "STEAM_0:0:000000000",
-    "STEAM_0:0:000000000",
-    "STEAM_0:0:000000000",
-};
-
-funcdef void FuncVoteEnd( Vote@, bool, int );
-funcdef void FuncVoteBlocked( Vote@, float );
+CClientCommand g_ClampDiffCommandAdmin("admin_clamp_diff", "Clamp the difficulty to min - max selected", @ClampDiffAdmin, ConCommandFlag::AdminOnly);
+CClientCommand g_DiffCommandAdmin("admin_diff", "Sets the Difficulty by a admin (0.0 - 100.0)", @DiffAdmin, ConCommandFlag::AdminOnly);
+CClientCommand g_DiffCommand("diff", "Vote to change the Difficulty (0.0 - 100.0)", @Diff );
 
 Diffy@ g_diffy;
 Timer@ g_timer;
 VoteAlt@ g_vote;
-BarnacleEatSpeed@ g_barnacle;
+ChangeVelocity@ g_speed;
 
-dictionary g_Player_Spamming;
+funcdef void FuncVoteEnd( Vote@, bool, int );
+funcdef void FuncVoteBlocked( Vote@, float );
 
-CClientCommand g_DiffCommandAdmin("admin_diff", "Sets the Difficulty by a admin (0.0 - 100.0)", @DiffAdmin, ConCommandFlag::AdminOnly);
-CClientCommand g_DiffCommand("diff", "Vote to change the Difficulty (0.0 - 100.0)", @Diff );
+void ClampDiffAdmin(const CCommand@ pArguments)
+{
+    CBasePlayer@ pPlayer = g_ConCommandSystem.GetCurrentPlayer();
+
+    string minClamp = pArguments.Arg(1);
+    string maxClamp = pArguments.Arg(2);
+
+    if( (minClamp == "" || maxClamp == "") && !g_diffy.VoidDisableDiff())
+        return;
+
+    double dminClamp = atod(minClamp)/100.0;
+    double dmaxClamp = atod(maxClamp)/100.0;
+
+    if( dminClamp >= 0 && dmaxClamp >= 0 )
+    {
+        g_diffy.ClampMin = (atod(minClamp) <= atod(maxClamp)) ? dminClamp : atod(maxClamp)/100.0;
+        g_diffy.ClampMin = (g_diffy.ClampMin < g_diffy.DiffBorders[0]) ? g_diffy.DiffBorders[0] : (g_diffy.ClampMin > g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1]) ? g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1] : g_diffy.ClampMin;
+        g_diffy.ClampMax = (atod(maxClamp) >= atod(minClamp)) ? dmaxClamp : dminClamp;
+        g_diffy.ClampMax = (g_diffy.ClampMax < g_diffy.DiffBorders[0]) ? g_diffy.DiffBorders[0] : (g_diffy.ClampMax > g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1]) ? g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1] : g_diffy.ClampMax;
+
+        g_PlayerFuncs.ClientPrintAll( HUD_PRINTNOTIFY, "[SERVER] Difficulty clamped by an admin\n" );
+        g_PlayerFuncs.ClientPrintAll( HUD_PRINTNOTIFY, "[SERVER] Min Diff: "+g_diffy.ClampMin*100+"\n" );
+        g_PlayerFuncs.ClientPrintAll( HUD_PRINTNOTIFY, "[SERVER] Max Diff: "+g_diffy.ClampMax*100+"\n" );
+        g_Game.AlertMessage( at_logged, "[SERVER] Difficulty clamped by an admin: "+pPlayer.pev.netname+"\n" );   
+        g_Game.AlertMessage( at_logged, "[SERVER] Min Diff: "+g_diffy.ClampMin*100+"\n" );
+        g_Game.AlertMessage( at_logged, "[SERVER] Max Diff: "+g_diffy.ClampMax*100+"\n" );
+    }
+    else
+    {
+        g_diffy.ClampMin = -1.0;
+        g_diffy.ClampMax = -1.0;
+    }
+
+    g_diffy.SetNewDifficult(g_diffy.VoidDiffPerPeople());
+}
 
 void DiffAdmin(const CCommand@ pArguments)
 {
@@ -26,7 +53,7 @@ void DiffAdmin(const CCommand@ pArguments)
 
     if( pArguments.ArgC() < 1 && aStr == "" && !g_diffy.VoidDisableDiff() ) 
         return;
-
+    
     g_diffy.SetNewDifficult(atod(aStr)/100.0);
 
     g_PlayerFuncs.ClientPrintAll( HUD_PRINTNOTIFY, "[SERVER] Difficulty changed by an admin\n" );
@@ -47,38 +74,35 @@ void Diff(const CCommand@ pArguments)
 void PluginInit()
 {
     g_Module.ScriptInfo.SetAuthor( "Cubemath | Gaftherman" );
-    g_Module.ScriptInfo.SetContactInfo( "Idk" );
+    g_Module.ScriptInfo.SetContactInfo( "https://github.com/CubeMath | https://github.com/Gaftherman" );
 
     g_Hooks.RegisterHook( Hooks::Player::ClientPutInServer, @ClientPutInServer );
     g_Hooks.RegisterHook( Hooks::Player::ClientDisconnect, @ClientDisconnect );
     g_Hooks.RegisterHook( Hooks::Player::PlayerKilled, @PlayerKilled );
-    g_Hooks.RegisterHook( Hooks::Game::EntityCreated, @EntityCreated );
     g_Hooks.RegisterHook( Hooks::Player::ClientSay, @ClientSay );
+    g_Hooks.RegisterHook( Hooks::Game::EntityCreated, @EntityCreated );
 
-    g_Player_Spamming.deleteAll();
-
-    Diffy dif();
+    Diffy diff();
     Timer time();
     VoteAlt vote();
-    BarnacleEatSpeed barnacle();
+    ChangeVelocity speed();
 
     @g_timer = @time;
-    @g_diffy = @dif;
+    @g_diffy = @diff;
     @g_vote = @vote;
-    @g_barnacle = @barnacle;
+    @g_speed = @speed;
 
     g_diffy.PluginInit(); 
     g_timer.PluginInit();
+    g_speed.PluginInit();
 }
 
 void MapActivate()
 { 
-    g_Player_Spamming.deleteAll();
-
     g_diffy.MapActivate(); 
     g_timer.MapActivate();
-
-    g_vote.DelayTimer = 30;
+    g_vote.MapActivate();
+    g_speed.MapActivate();
 }
 
 HookReturnCode ClientPutInServer( CBasePlayer@ pPlayer )
@@ -113,19 +137,11 @@ HookReturnCode PlayerKilled(CBasePlayer@ pPlayer, CBaseEntity@ pAttacker, int iG
     return HOOK_CONTINUE;
 }
 
-HookReturnCode EntityCreated(CBaseEntity@ pEntity)
-{
-    if( pEntity.IsMonster() && !pEntity.IsNetClient() )
-        g_diffy.EntitiesInThisMap.insertLast( pEntity );
-
-    return HOOK_CONTINUE;
-}
-
 HookReturnCode ClientSay( SayParameters@ pParams ) 
 {
     CBasePlayer@ pPlayer = pParams.GetPlayer();
     const CCommand@ args = pParams.GetArguments();
-    string cmd = pParams.GetCommand();
+    string FullSentence = pParams.GetCommand(); FullSentence.ToUppercase();
 
     if( !g_diffy.VoidDisableDiff() && (args[0] == "/vote" && args[1] == "diff" && args.ArgC() >= 3 || args[0] == "/votediff" && args.ArgC() >= 2) )
     {	
@@ -134,29 +150,44 @@ HookReturnCode ClientSay( SayParameters@ pParams )
         else if( args[0] == "/votediff" )
             g_vote.Vote( pPlayer, args[1] );
 
-        return HOOK_HANDLED;
+        return HOOK_CONTINUE;
     }
 
-    cmd.ToUppercase();
+    array<string> FindMessage = { "DIFF", "STATUS", "DIFFSTATUS", "DIFSTATUS" };
 
-    bool strTest = (cmd.Find("DIFF") != String::INVALID_INDEX);
-    strTest = strTest || (cmd.Find("STATUS") != String::INVALID_INDEX);
-    strTest = strTest || (cmd.Find("DIFFSTATUS") != String::INVALID_INDEX);
-    strTest = strTest || (cmd.Find("DIFSTATUS") != String::INVALID_INDEX);
-    strTest = strTest && (g_diffy.MessageTime < g_Engine.time);
-
-    if( strTest ) 
+    for( uint i = 0; i < FindMessage.length();++i )
     {
-        g_diffy.Message();
+        if(FullSentence.Find(FindMessage[i]) != String::INVALID_INDEX && g_diffy.MessageTime < g_Engine.time)
+        {
+            g_diffy.Message();
+            break;
+        }
     }
-    
+
+    return HOOK_CONTINUE;
+}
+
+HookReturnCode EntityCreated(CBaseEntity@ pEntity)
+{
+    if( pEntity.IsMonster() && !pEntity.IsNetClient()  )
+    {
+        if( pEntity.pev.classname == "monster_barnacle" )
+        {
+            g_speed.BarnaclesInThisMap.insertLast( pEntity );
+        }
+        else
+        {
+            g_speed.MonstersInThisMap.insertLast( pEntity );
+        }
+    }
+
     return HOOK_CONTINUE;
 }
 
 final class Diffy
 {
     /************************************/
-    /*            Scheduler             */
+    /*            Schedulers            */
     /************************************/
     CScheduledFunction@ CountPeopleScheduler;
     CScheduledFunction@ Enable30SecScheduler;
@@ -183,7 +214,7 @@ final class Diffy
     double VoidNewDifficult() { return NewDifficult; }
 
     /******************************/
-    /* last Difficulty of the map */
+    /* Last Difficulty of the map */
     /******************************/
     private double LastDifficult = 0.0;
     double VoidLastDifficult() { return LastDifficult; }
@@ -218,12 +249,6 @@ final class Diffy
     private double LastInitialMaxArmor = 0.0;
     double VoidLastInitialMaxArmor() { return LastInitialMaxArmor; }
 
-    /*********************************/
-    /* Current Speed of the monsters */
-    /*********************************/
-    private double InitialMonsterSpeed = 1.0f;
-    double VoidInitialMonsterSpeed() { return InitialMonsterSpeed; }
-
     /*****************/
     /* Enable Diffy? */
     /*****************/
@@ -249,6 +274,16 @@ final class Diffy
     /* Message Time	*/
     /****************/
     double MessageTime = 0.0;
+
+    /*************/
+    /* Clamp min */
+    /*************/
+    double ClampMin = -1.0;
+
+    /*************/
+    /* Clamp min */
+    /*************/
+    double ClampMax = -1.0;
 
     /*******************************/
     /* Difficulty per people array */
@@ -289,6 +324,7 @@ final class Diffy
         0.850, //31
         0.850  //32
     };
+    double VoidDiffPerPeople() { return DiffPerPeople[g_PlayerFuncs.GetNumPlayers()]; }
     
     /****************************/
     /* Difficulty borders array */
@@ -334,15 +370,6 @@ final class Diffy
     };
     double VoidPlayerMaxArmorCharge() { return MaxArray( PlayerMaxArmorCharge ); }
 
-    /***********************/
-    /* Monster speed array */
-    /***********************/
-    private array<double> MonsterSpeedMultiplier =
-    {
-        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.5, 1.8
-    };
-    double VoidMonsterSpeedMultiplier() { return MaxArray( MonsterSpeedMultiplier ); }
-
     Diffy()
     {	
         NewDifficult = 0.5;
@@ -352,6 +379,8 @@ final class Diffy
         MessageTime = 0.0;
         LastDifficult = 0.0;
         DisableDiff = false;
+        ClampMin = -1.0;
+        ClampMax = -1.0;
 
         ReadSkill();
         ChangeMaxHealth();
@@ -379,7 +408,7 @@ final class Diffy
         MessageTime = 0.0;
         LastPlayerNum = Math.clamp( 0, 32, PlayerNumNow );
 
-        double DifficulSelected = (DiffPerPeople[LastPlayerNum]);;
+        double DifficulSelected = (DiffPerPeople[LastPlayerNum]);
 
         // After changing the difficulty, it will remain until after you reset the map twice.(WIP)
         /*if( g_timer.Fails % 2 == 1 )
@@ -404,7 +433,7 @@ final class Diffy
     void Message()
     {
         MessageTime = g_Engine.time + 15.0f;
-        g_Game.AlertMessage( at_logged, GetMessage() + g_timer.GetMessage(0) +"\n"  );
+        g_Game.AlertMessage( at_logged, GetMessage() + g_timer.GetMessage(0) + "\n"  );
         g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, GetMessage() + g_timer.GetMessage(0) + "\n"  );
     }
 
@@ -413,17 +442,26 @@ final class Diffy
         if( DisableDiff ) 
             return;
 
-        if( NewDiff < DiffBorders[0] ) NewDiff = DiffBorders[0];
-        if( NewDiff > DiffBorders[DiffBorders.length()-1] ) NewDiff = DiffBorders[DiffBorders.length()-1];
-        if( NewDiff < (DiffBorders[0]+0.001) && NewDiff > DiffBorders[0] ) NewDiff = (DiffBorders[0]+0.001);
-        if( NewDiff > (DiffBorders[DiffBorders.length()-1]-0.001) && NewDiff < DiffBorders[DiffBorders.length()-1] ) NewDiff = (DiffBorders[DiffBorders.length()-1]-0.001);
+        if( ClampMin < 0 || ClampMax < 0 )
+        {
+            if( NewDiff < DiffBorders[0] ) NewDiff = DiffBorders[0];
+            if( NewDiff > DiffBorders[DiffBorders.length()-1] ) NewDiff = DiffBorders[DiffBorders.length()-1];
+            if( NewDiff < ( DiffBorders[0] + 0.001 ) && NewDiff > DiffBorders[0] ) NewDiff = ( DiffBorders[0] + 0.001 );
+            if( NewDiff > ( DiffBorders[DiffBorders.length()-1]-0.001 ) && NewDiff < DiffBorders[DiffBorders.length()-1] ) NewDiff = ( DiffBorders[DiffBorders.length()-1]-0.001 );
+        }
+        else
+        {
+            if( NewDiff < ClampMin ) NewDiff = ClampMin;
+            if( NewDiff > ClampMax ) NewDiff = ClampMax;
+            if( NewDiff < (ClampMin+0.001 ) && NewDiff > ClampMin ) NewDiff = ( ClampMin+0.001 );
+            if( NewDiff > (ClampMax-0.001 ) && NewDiff < ClampMax ) NewDiff = ( ClampMax-0.001 );
+        }
 
         NewDifficult = NewDiff;
         LastDifficult = NewDifficult;
 
         ChangeSkill();
         ChangeMaxHealth();
-        ChangeVelocity();
         CheckPointDisabled();
     }
 
@@ -445,7 +483,6 @@ final class Diffy
             g_timer.Fails = 0;
             g_timer.OldMap = "";
         }
-
     }
 
     void ReadSkill()
@@ -495,32 +532,6 @@ final class Diffy
             }
         }		
     }
-    
-    void ChangeVelocity()
-    {
-        ThinkChangeVelocity();
-        g_barnacle.Think();
-    }
-
-    void ThinkChangeVelocity()
-    {
-        InitialMonsterSpeed = VoidMonsterSpeedMultiplier();
-
-        if( InitialMonsterSpeed > 1.0 )
-        {
-            for( uint i = 0; i < EntitiesInThisMap.length(); ++i ) 
-            {
-                CBaseEntity@ monsters = cast<CBaseEntity@>( EntitiesInThisMap[i].GetEntity() );
-
-                if( monsters !is null && !monsters.IsNetClient() && monsters.IsAlive() && monsters.pev.classname != "monster_barnacle" )
-                {
-                    monsters.pev.framerate = InitialMonsterSpeed;
-                }
-            }
-        }
-
-        g_Scheduler.SetTimeout( @this, "ThinkChangeVelocity", 0.1 );
-    }
 
     void ChangeSkill()
     {
@@ -552,8 +563,8 @@ final class Diffy
                     ent.pev.health = SKValue(7);
                 else if( ent.pev.classname == "monster_barney_dead" )
                     ent.pev.health = SKValue(7);
-                else if( ent.pev.classname == "monster_bigmomma" )
-                    ent.pev.health = SKValue(12);
+                /*else if( ent.pev.classname == "monster_bigmomma" )
+                    ent.pev.health = SKValue(12);*/
                 else if( ent.pev.classname == "monster_blkop_osprey" )
                     ent.pev.health = SKValue(123);
                 else if( ent.pev.classname == "monster_blkop_apache" )
@@ -637,8 +648,11 @@ final class Diffy
             if( pPlayer is null || !pPlayer.IsConnected() )
                 continue;
 
-            if( pPlayer.pev.max_health < 1.0 ) pPlayer.pev.max_health = 1.0;
-            if( pPlayer.pev.armortype < 1.0 ) pPlayer.pev.armortype = 1.0;	
+            if( pPlayer.pev.max_health < 1.0 ) 
+                pPlayer.pev.max_health = 1.0;
+
+            if( pPlayer.pev.armortype < 1.0 ) 
+                pPlayer.pev.armortype = 1.0;	
 
             // if(pPlayer.pev.health > 0.0)
             //     pPlayer.pev.health *= InitialMaxHealth/h2 + 1.0;
@@ -853,6 +867,11 @@ final class Diffy
 
 final class Timer
 {
+    /************************************/
+    /*            Scheduler             */
+    /************************************/
+    CScheduledFunction@ Enable30SecScheduler;
+
     /***************************/
     /* Current name of the map */
     /***************************/
@@ -878,6 +897,8 @@ final class Timer
 
     Timer()
     {
+        OldMap = "";
+
         Fails = 0;
 
         TimerS = 0;
@@ -892,50 +913,49 @@ final class Timer
 
     void PluginInit()
     {
-        if( OldMap != g_Engine.mapname )
-        {
-            OldMap = g_Engine.mapname;
-        }
+		if(Enable30SecScheduler !is null)
+			g_Scheduler.RemoveTimer(Enable30SecScheduler);
 
-        if( g_Engine.time < 5.5f )
-        {
-            g_Scheduler.SetTimeout( @this, "PluginInit", 5.5f-g_Engine.time);
-            return;
-        }
-
-        CubePavo = true;
+		@Enable30SecScheduler = g_Scheduler.SetTimeout( @this, "EnableCount", 33.0f );
     }
 
     void MapActivate()
     {
-        if( CubePavo )
+        if( OldMap != g_Engine.mapname )
         {
-            if( OldMap != g_Engine.mapname )
-            {
-                Fails = 0;
-                TimerS = 0;
-                TimerM = 0;
-                TimerH = 0;
-                TimerD = 0;
+            OldMap = g_Engine.mapname;
 
-                OldMap = g_Engine.mapname;
-            }
-            else
-            {
-                ++Fails;
-            }
+            Fails = 0;
+
+            TimerS = 0;
+            TimerM = 0;
+            TimerH = 0;
+            TimerD = 0;
+
         }
+        else
+        {
+            if( CubePavo )
+                ++Fails;
+        }
+
+		CubePavo = false;
+
+		if(Enable30SecScheduler !is null)
+			g_Scheduler.RemoveTimer(Enable30SecScheduler);
+
+		@Enable30SecScheduler = g_Scheduler.SetTimeout( @this, "EnableCount", 33.0f );
     }
     
     void Think()
     {   	
-        if( TimerS == 60 )
+        if( TimerS >= 60 )
         { ++TimerM; TimerS = 0; }
 
-        if( TimerM == 60 )
+        if( TimerM >= 60 )
         { ++TimerH; TimerM = 0; }
 
-        if( TimerH == 24 )
+        if( TimerH >= 24 )
         { ++TimerD; TimerH = 0; }
             
         ++TimerS;
@@ -975,8 +995,12 @@ final class Timer
                 break;
             }
         }
-
         return Time + " (Map restarted: " +Fails+ " times)";
+    }
+
+    void EnableCount()
+    {
+        CubePavo = true;
     }
 }
 
@@ -986,28 +1010,18 @@ class PlayerVote
     int ivotedelay = 120;
 }
 
-PlayerVote@ GetPlayerVote(CBasePlayer@ pPlayer)
-{
-    string SteamID = g_EngineFuncs.GetPlayerAuthId(pPlayer.edict());
-
-    if( !g_Player_Spamming.exists(SteamID) )
-    {
-        PlayerVote state;
-        g_Player_Spamming[SteamID] = state;
-    }
-
-    return cast<PlayerVote@>( g_Player_Spamming[SteamID] );
-}
-
-int FindSteamID(CBasePlayer@ pPlayer)
-{
-    string SteamID = g_EngineFuncs.GetPlayerAuthId(pPlayer.edict());
-
-    return SteamIDArray.find( SteamID );
-}
-
 final class VoteAlt
 {
+    /*********************************************/
+    /* People who can't use the vote temporarily */
+    /*********************************************/   
+    dictionary g_Player_Spamming;
+
+    /****************************************/
+    /* People banned who can't use the vote */
+    /****************************************/   
+    array<string> SteamIDArray;
+
     /***************************/
     /* Current Time of the map */
     /***************************/
@@ -1024,6 +1038,17 @@ final class VoteAlt
         DiffSelected = 0;
 
         Think();
+
+        ReadBannedPeopleFile();
+    }
+
+    void MapActivate()
+    {
+        DelayTimer = 30;
+
+        ReadBannedPeopleFile();
+
+        g_Player_Spamming.deleteAll();
     }
 
     void Think()
@@ -1049,19 +1074,25 @@ final class VoteAlt
                 VoteState.ivote = 0;
         }
 
-        g_Scheduler.SetTimeout( @this, "Think", 1.0);
+        g_Scheduler.SetTimeout( @this, "Think", 1.0 );
     }
 
     void Vote( CBasePlayer@ pPlayer, string message ) 
     {
-        DiffSelected = (atof(message)/100);
-        g_Game.AlertMessage( at_console, string(DiffSelected)+'\n');
+        DiffSelected = atod(message)/100;
 
-        if( DiffSelected < g_diffy.DiffBorders[0] ) DiffSelected = g_diffy.DiffBorders[0];
-        if( DiffSelected > g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1] ) DiffSelected = g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1];
-        if( DiffSelected < (g_diffy.DiffBorders[0]+0.001) && DiffSelected > g_diffy.DiffBorders[0] ) DiffSelected = (g_diffy.DiffBorders[0]+0.001);
-        if( DiffSelected > (g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1]-0.001) && DiffSelected < g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1] ) DiffSelected = (g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1]-0.001);
-
+        if( g_diffy.ClampMin < 0 && g_diffy.ClampMax < 0 )
+        {
+            if( DiffSelected < g_diffy.DiffBorders[0] ) DiffSelected = g_diffy.DiffBorders[0];
+            if( DiffSelected > g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1] ) DiffSelected = g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1];
+            if( DiffSelected < (g_diffy.DiffBorders[0]+0.001) && DiffSelected > g_diffy.DiffBorders[0] ) DiffSelected = (g_diffy.DiffBorders[0]+0.001);
+            if( DiffSelected > (g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1]-0.001) && DiffSelected < g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1] ) DiffSelected = (g_diffy.DiffBorders[g_diffy.DiffBorders.length()-1]-0.001);
+        }
+        else
+        {
+            DiffSelected = (DiffSelected < g_diffy.ClampMin) ? g_diffy.ClampMin : (DiffSelected > g_diffy.ClampMax) ? g_diffy.ClampMax : DiffSelected;
+        }
+        
         int ChooseDiffInt = int(DiffSelected*1000.0);
         string Message = string(ChooseDiffInt/10)+"."+string(ChooseDiffInt%10)+"%%";
 
@@ -1088,7 +1119,7 @@ final class VoteAlt
             return;			
         }
 
-        if( FindSteamID( pPlayer ) >= 0 )
+        if( FindSteamID( pPlayer ) )
         {
             g_PlayerFuncs.SayText( pPlayer, "Votes for you have been disabled. (PERMANENT)\n" );
             return;
@@ -1106,7 +1137,7 @@ final class VoteAlt
             return;
         }
         
-        if( g_PlayerFuncs.GetNumPlayers() <= 1 )
+        if( g_PlayerFuncs.GetNumPlayers() > 1 )
         {
             DelayTimer = 30;
 
@@ -1164,52 +1195,185 @@ final class VoteAlt
 
     void VoteBlocked(Vote@ pVote, float flTime)
     {
-        g_Scheduler.SetTimeout( "Vote", flTime, false );
+        g_Scheduler.SetTimeout( @this, "Vote", flTime, false );
+    }
+
+    void ReadBannedPeopleFile()
+    {
+        SteamIDArray.resize(0);
+
+        File@ pFile = g_FileSystem.OpenFile( "scripts/plugins/store/DDX-Banned.txt", OpenFile::READ );
+
+        if( pFile is null || !pFile.IsOpen() ) 
+            return;
+
+        string line;
+
+        while( !pFile.EOFReached() )
+        {
+            pFile.ReadLine( line );
+                
+            if( line.Find("//") != String::INVALID_INDEX ) 
+                continue;
+
+            SteamIDArray.insertLast( line );
+        }
+
+        pFile.Close();
+    }
+
+    bool FindSteamID(CBasePlayer@ pPlayer)
+    {
+        string SteamID = g_EngineFuncs.GetPlayerAuthId(pPlayer.edict());
+
+        return SteamIDArray.find( SteamID ) >= 0;
+    }
+
+    PlayerVote@ GetPlayerVote(CBasePlayer@ pPlayer)
+    {
+        string SteamID = g_EngineFuncs.GetPlayerAuthId(pPlayer.edict());
+
+        if( !g_Player_Spamming.exists(SteamID) )
+        {
+            PlayerVote state;
+            g_Player_Spamming[SteamID] = state;
+        }
+
+        return cast<PlayerVote@>( g_Player_Spamming[SteamID] );
     }
 }
 
-final class BarnacleEatSpeed
+final class ChangeVelocity
 {
+    /**************************/
+    /* Array of just monsters */
+    /**************************/
+    array<EHandle> MonstersInThisMap;
+
+    /***************************/
+    /* Array of just barnacles */
+    /***************************/
+    array<EHandle> BarnaclesInThisMap;
+
+    /*********************************/
+    /* Current Speed of the monsters */
+    /*********************************/
+    private double InitialMonsterSpeed = 1.0f;
+    double VoidInitialMonsterSpeed() { return InitialMonsterSpeed; }
+
+    /***********************/
+    /* Monster speed array */
+    /***********************/
+    private array<double> MonsterSpeedMultiplier =
+    {
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.5, 1.8
+    };
+    double VoidMonsterSpeedMultiplier() { return g_diffy.MaxArray( MonsterSpeedMultiplier ); }
+
     /****************************************/
     /* Current Speed of the barnacle tongue */
     /****************************************/
-    private double InitialBarnacleSpeed = 8.0f;
-    double VoidInitialBarnacleSpeed() { return InitialBarnacleSpeed; }
+    private double InitialBarnacleEatSpeed = 8.0f;
+    double VoidInitialBarnacleEatSpeed() { return InitialBarnacleEatSpeed; }
 
     /****************************/
     /* Barnacle speed eat array */
     /****************************/
-    private array<double> BarnacleSpeed =
+    private array<double> BarnacleEatSpeed =
     {
         8.0, 8.0, 8.0, 8.0, 8.0, 18.0, 32.0, 48.0
     };
-    double VoidBarnacleSpeed() { return g_diffy.MaxArray( BarnacleSpeed ); }
+    double VoidBarnacleEatSpeed() { return g_diffy.MaxArray( BarnacleEatSpeed ); }
 
-    BarnacleEatSpeed()
+    ChangeVelocity()
     {
-        //Hola :D
+        InitialMonsterSpeed = 1.0f;
+        InitialBarnacleEatSpeed = 8.0f;
     }
 
-    void Think()
-    {	
-        InitialBarnacleSpeed = VoidBarnacleSpeed();
+    void PluginInit()
+    {
+        VerifyEntities();
 
-        if( InitialBarnacleSpeed > 8 )
+        ThinkChangeBarnacleEatSpeed();
+        ThinkChangeMonsterVelocity();
+    }
+
+    void MapActivate()
+    {
+        VerifyEntities();
+    }
+
+    void VerifyEntities()
+    {
+        MonstersInThisMap.resize(0);
+        BarnaclesInThisMap.resize(0);
+
+        for( uint i = 0; i < g_diffy.EntitiesInThisMap.length(); ++i ) 
         {
-            for( uint i = 0; i < g_diffy.EntitiesInThisMap.length(); ++i ) 
-            {
-                CBaseMonster@ monsters = cast<CBaseMonster@>( g_diffy.EntitiesInThisMap[i].GetEntity() );
+            CBaseEntity@ pEntity = cast<CBaseEntity@>( g_diffy.EntitiesInThisMap[i].GetEntity() );  
 
-                if( monsters !is null && !monsters.IsNetClient() && monsters.IsAlive() && monsters.pev.classname == "monster_barnacle" )
+            if( pEntity is null || pEntity.IsNetClient() || !pEntity.IsAlive() )
+                continue;
+
+            if( pEntity.pev.classname == "monster_barnacle" )
+            {
+                BarnaclesInThisMap.insertLast( pEntity );
+            }
+            else
+            {
+                MonstersInThisMap.insertLast( pEntity );
+            }
+        }   
+    }
+
+    void ThinkChangeBarnacleEatSpeed()
+    {	
+        InitialBarnacleEatSpeed = VoidBarnacleEatSpeed();
+
+        if( InitialBarnacleEatSpeed > 8 )
+        {
+            for( uint i = 0; i < BarnaclesInThisMap.length(); ++i ) 
+            {
+                CBaseMonster@ monsters = cast<CBaseMonster@>( BarnaclesInThisMap[i].GetEntity() );
+
+                if( monsters !is null && monsters.IsAlive() )
                 {
                     if( monsters.m_hEnemy.GetEntity() !is null && abs(monsters.pev.origin.z - ((monsters.m_hEnemy.GetEntity().pev.origin.z + monsters.m_hEnemy.GetEntity().pev.view_ofs.z) - 8)) >= 44 && monsters.m_Activity == ACT_RESET )
                     {
-                        monsters.m_hEnemy.GetEntity().pev.origin.z += InitialBarnacleSpeed;
+                        monsters.m_hEnemy.GetEntity().pev.origin.z += InitialBarnacleEatSpeed;
                     }	
+                }
+                else
+                {
+                    BarnaclesInThisMap.removeAt( i );
                 }
             }
         }
+        g_Scheduler.SetTimeout( @this, "ThinkChangeBarnacleEatSpeed", 1.0 );
+    }
 
-        g_Scheduler.SetTimeout( @this, "Think", 0.1 );
+    void ThinkChangeMonsterVelocity()
+    {
+        InitialMonsterSpeed = VoidMonsterSpeedMultiplier();
+
+        if( InitialMonsterSpeed > 1.0 )
+        {
+            for( uint i = 0; i < MonstersInThisMap.length(); ++i ) 
+            {
+                CBaseMonster@ monsters = cast<CBaseMonster@>( MonstersInThisMap[i].GetEntity() );
+
+                if( monsters !is null && monsters.IsAlive() )
+                {
+                    if( monsters.m_IdealMonsterState != MONSTERSTATE_SCRIPT )
+                        monsters.pev.framerate = InitialMonsterSpeed;
+                }
+                else
+                {
+                    MonstersInThisMap.removeAt( i );
+                }
+            }
+        }
+        g_Scheduler.SetTimeout( @this, "ThinkChangeMonsterVelocity", 1.0 );
     }
 }
