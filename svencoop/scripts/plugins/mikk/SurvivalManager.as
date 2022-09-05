@@ -199,8 +199,8 @@ HookReturnCode ClientSay( SayParameters@ pParams )
 			if(iLanguage == 1 ) g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTTALK, "[Survival Manager] Votacion iniciada por " + g_szPlayerName + "\n" );
 			else if(iLanguage == 2 ) g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTTALK, "[Survival Manager] Votacao iniciada por " + g_szPlayerName + "\n" );
 			else if(iLanguage == 3 ) g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTTALK, "[Survival Manager] Abstimmung gestartet von " + g_szPlayerName + "\n" );
-			else if(iLanguage == 4 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "[Survival Manager] Vote commence par " + g_szPlayerName + "\n" );
-			else if(iLanguage == 5 ) g_PlayerFuncs.ClientPrintAll( HUD_PRINTTALK, "[Survival Manager] Votazione iniziata da " + g_szPlayerName + "\n" );
+			else if(iLanguage == 4 ) g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTTALK, "[Survival Manager] Vote commence par " + g_szPlayerName + "\n" );
+			else if(iLanguage == 5 ) g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTTALK, "[Survival Manager] Votazione iniziata da " + g_szPlayerName + "\n" );
 			else g_PlayerFuncs.ClientPrint( pPlayer, HUD_PRINTTALK, "[Survival Manager] Vote started by " + g_szPlayerName +"\n" );
 
 			StartVoteMenu();

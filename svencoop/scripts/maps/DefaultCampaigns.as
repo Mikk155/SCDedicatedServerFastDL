@@ -9,7 +9,7 @@
 #include "cubemath/geneworm"
 #include "mikk/multi_language"
 #include "mikk/entities/trigger_once_mp"
-#include "mikk/entities/point_checkpoint"
+//#include "mikk/entities/point_checkpoint"
 
 array<ItemMapping@> g_ClassicWeapons = 
 {
@@ -34,7 +34,7 @@ void LPMapInitialization()
 	RegisterCustomTextGame();
 	RegisterHL9mmhandgun();
 	RegisterAntiRushEntity();
-	RegisterPointCheckPointEntity();
+//	RegisterPointCheckPointEntity();
 	
 	if( string(g_Engine.mapname).StartsWith("of"))
 	{

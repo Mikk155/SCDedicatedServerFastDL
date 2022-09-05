@@ -1,0 +1,16 @@
+decals.wad
+halflife.wad
+liquids.wad
+models/cubemath/chars/d6.mdl
+models/cubemath/chars/percent.mdl
+sound/ambience/alien_chatter.wav
+sound/ambience/labdrone2.wav
+sound/ambience/squeeks1.wav
+sound/ambience/turretrot2.wav
+sound/ambience/wind1.wav
+sound/buttons/bell1.wav
+sound/doors/doorstop2.wav
+sound/items/medshot4.wav
+sprites/glow01.spr
+sprites/level_change.spr
+xeno.wad
