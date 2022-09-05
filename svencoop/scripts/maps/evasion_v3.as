@@ -1,10 +1,8 @@
 #include "point_checkpoint"
 #include "beast/game_hudsprite"
 
-#include "opfor/nvision"
+#include "DefaultCampaigns"
 
-#include "mikk/entities/utils"
-#include "mikk/entities/trigger_once_mp"
 #include "cubemath/polling_check_players"
 
 const float flSurvivalVoteAllow = g_EngineFuncs.CVarGetFloat( "mp_survival_voteallow" );
@@ -13,8 +11,6 @@ void MapInit()
 {
 	RegisterPointCheckPointEntity();
 	RegisterGameHudSpriteEntity();
-	NightVision::Enable();
-	RegisterAntiRushEntity();
   poll_check();
 	// Global CVars
 	g_EngineFuncs.CVarSetFloat( "mp_hevsuit_voice", 0 );
@@ -26,6 +22,12 @@ void MapInit()
 		if( flSurvivalVoteAllow > 0 )
 			g_EngineFuncs.CVarSetFloat( "mp_survival_voteallow", 0 );
 	}
+	LPMapInitialization();
+}
+
+void MapActivate()
+{
+	LPMapActivate();
 }
 
 // Trigger Script for Survival Mode

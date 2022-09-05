@@ -36,7 +36,7 @@ void LPMapInitialization()
 	RegisterAntiRushEntity();
 //	RegisterPointCheckPointEntity();
 	
-	if( string(g_Engine.mapname).StartsWith("of"))
+	if( string(g_Engine.mapname).StartsWith("of") || string(g_Engine.mapname).StartsWith("evasion"))
 	{
 		g_nv.MapInit();
 		RegisterKnife();

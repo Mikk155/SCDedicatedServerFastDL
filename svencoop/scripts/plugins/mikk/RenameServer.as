@@ -14,7 +14,7 @@
 // Starts of customizable zone
 
 // Name of your server
-const string strHostname = "[US] Limitless Potential (Hardcore + Anti-Rush)";
+const string strHostname = "[US] Hardcore + Anti-Rush";
 
 // < name of your map		|		title of your hostname >
 

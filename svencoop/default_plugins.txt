@@ -26,6 +26,21 @@
 		"name" "Player Decal Tracker"
 		"script" "PlayerDecalTracker"
 	}
+	"plugin"
+	{
+		"name" "AntiFlood"
+		"script" "AntiFlood"
+	}
+	"plugin"
+	{
+		"name" "VoteMap"
+		"script" "VoteMap"
+	}
+	"plugin"
+	{
+		"name" "VoteRestart"
+		"script" "VoteRestart"
+	}
 
     "plugin"
     {
@@ -41,11 +56,6 @@
 	{
 		"name" "UseOnlyItems"
 		"script" "mikk/UseOnlyItems"
-	}
-	"plugin"
-	{
-		"name" "SurvivalManager"
-		"script" "mikk/SurvivalManager"
 	}
 	"plugin"
 	{

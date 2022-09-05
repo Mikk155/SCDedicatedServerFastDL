@@ -2,10 +2,7 @@
 
 #include "beast/npc_transition"
 
-#include "opfor/nvision"
-
-#include "mikk/entities/utils"
-#include "mikk/entities/trigger_once_mp"
+#include "DefaultCampaigns"
 #include "cubemath/polling_check_players"
 
 const float flSurvivalVoteAllow = g_EngineFuncs.CVarGetFloat( "mp_survival_voteallow" );
@@ -14,13 +11,10 @@ void MapInit()
 {
 	// Enable SC CheckPoint Support for Survival Mode
 	RegisterPointCheckPointEntity();
-	// Enable Nightvision Support
-	NightVision::Enable();
 	// Global CVars
 	g_EngineFuncs.CVarSetFloat( "mp_hevsuit_voice", 0 );
 
 	NPC_TRANSITION::EntityRegister();
-	RegisterAntiRushEntity();
   poll_check();
 
 	if( g_Engine.mapname == "of_utbm_7" || g_Engine.mapname == "of_utbm_8" || g_Engine.mapname == "of_utbm_9" )
@@ -33,6 +27,12 @@ void MapInit()
 		if( flSurvivalVoteAllow > 0 )
 			g_EngineFuncs.CVarSetFloat( "mp_survival_voteallow", 0 );
 	}
+	LPMapInitialization();
+}
+
+void MapActivate()
+{
+	LPMapActivate();
 }
 
 void MapStart()
